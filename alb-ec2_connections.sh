@@ -24,7 +24,7 @@ usage() {
 
 Usage: bash $0 [ -a <string> -u <string> -t <string> ]
 
-   -a : specify the name of autoscaling group
+   -a : specify the name of Application Load Balancer 
 
    -u : specify the user of ssh connection
 
