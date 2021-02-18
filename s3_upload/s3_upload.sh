@@ -71,7 +71,7 @@ shift $((OPTIND - 1))
 
 function putS3() {
 
-    resource="/${S3_BUCKET}/${REMOTE_PATH}/${FILE}"
+    resource="/${S3_BUCKET}/${REMOTE_PATH}${FILE}"
     contentType="application/x-compressed-tar"
     dateValue=$(date -R)
     stringToSign="PUT\n\n${contentType}\n${dateValue}\n${resource}"
@@ -81,8 +81,8 @@ function putS3() {
         -H "Date: ${dateValue}" \
         -H "Content-Type: ${contentType}" \
         -H "Authorization: AWS ${AWS_ACCESS_KEY_ID}:${signature}" \
-        https://${S3_BUCKET}.s3.amazonaws.com/${REMOTE_PATH}/${FILE}
-    echo "FILE correctly uploaded at  https://s3.console.aws.amazon.com/s3/buckets/${S3_BUCKET}?region=us-east-1&prefix=${REMOTE_PATH}/"
+        https://${S3_BUCKET}.s3.amazonaws.com/${REMOTE_PATH}${FILE}
+    echo "FILE correctly uploaded at  https://s3.console.aws.amazon.com/s3/buckets/${S3_BUCKET}?region=us-east-1&prefix=${REMOTE_PATH}"
 }
 
 putS3 
