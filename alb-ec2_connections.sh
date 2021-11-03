@@ -32,6 +32,8 @@ Usage: bash $0 [ -a <string> -u <string> -t <string> ]
 
    -t : specify the type of IP address [public|private]
 
+   -v : specify the version of load balancer [1|2]
+
    -h : this help
 
    "
@@ -45,7 +47,7 @@ if [ "$#" -eq 0 ]; then
    exit 1
 fi
 
-while getopts "a:u:k:m:t:h" o; do
+while getopts "a:u:k:m:t:v:h" o; do
    case "${o}" in
    a)
       ALB=${OPTARG}
@@ -59,6 +61,9 @@ while getopts "a:u:k:m:t:h" o; do
    t)
       TYPE=${OPTARG}
       ;;
+   v)
+      V=${OPTARG}
+      ;;
    h)
       usage
       ;;
@@ -70,7 +75,18 @@ done
 shift $((OPTIND - 1))
 
 AGGREGATOR="elb describe-load-balancers --load-balancer-name"
-INSTANCE_IDs=`aws $AGGREGATOR $ALB | grep InstanceId | cut -d':' -f2 | sed 's/\"//g' | sed 's/[[:blank:]]//g'`
+
+if [ -z $V ] || [ $V -eq 2 ]
+then
+   ALB_ARN=`aws elbv2 describe-load-balancers --names $ALB | jq .LoadBalancers[].LoadBalancerArn | sed 's/\"//g' | sed 's/[[:blank:]]//g'`
+   echo "Got load balancer"
+   TG_ARN=`aws elbv2 describe-target-groups --load-balancer-arn  $ALB_ARN | jq .TargetGroups[].TargetGroupArn | sed 's/\"//g' | sed 's/[[:blank:]]//g'`
+   echo "Got the target group"
+   INSTANCE_IDs=`aws elbv2 describe-target-health  --target-group-arn $TG_ARN | jq .TargetHealthDescriptions[].Target.Id | sed 's/\"//g' | sed 's/[[:blank:]]//g'`
+   echo "Got the instances ID"
+else 
+   INSTANCE_IDs=`aws $AGGREGATOR $ALB | grep InstanceId | cut -d':' -f2 | sed 's/\"//g' | sed 's/[[:blank:]]//g'`
+fi
 
 NUM_INSTANCE=`echo $INSTANCE_IDs | tr ' ' '\n' | wc -l | sed 's/ //g'`
 #echo "===> $NUM_INSTANCE"
@@ -86,10 +102,14 @@ fi
 NAME_TMUX_SESSION=$ALB
 COUNT=0
 
-#echo $INSTANCE_IDs
-
 #Start tmux session in background
 tmux new -s $NAME_TMUX_SESSION -d
+
+   #IP address to catch
+   LABEL_ADDRESS="PrivateIpAddress"
+   if [ "${TYPE}" == "public" ]; then
+      LABEL_ADDRESS="PublicIpAddress"
+   fi
 
 for id in $INSTANCE_IDs
   do
@@ -99,12 +119,6 @@ for id in $INSTANCE_IDs
      then
        tmux split-window -v -t $NAME_TMUX_SESSION
     fi
-
-      #IP address to catch
-   LABEL_ADDRESS="PrivateIpAddress"
-   if [ "${TYPE}" == "public" ]; then
-      LABEL_ADDRESS="PublicIpAddress"
-   fi
 
     INSTANCE_ADDR=`aws ec2 describe-instances --instance-ids $id | grep $LABEL_ADDRESS | cut -d':' -f2 | sed 's/\"//g' |sed 's/,//g'  |  sed 's/[[:blank:]]//g'`
 
